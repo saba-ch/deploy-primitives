@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src"]
+}
