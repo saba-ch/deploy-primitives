@@ -1,0 +1,15 @@
+{
+  "name": "primitives",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -C e2e test",
+    "typecheck": "pnpm -r exec tsc -p ."
+  },
+  "devDependencies": {
+    "@mastra/platform-cli": "workspace:*",
+    "mastra": "1.38.0",
+    "typescript": "7.0.2",
+    "@types/node": "^26.0.0"
+  }
+}
