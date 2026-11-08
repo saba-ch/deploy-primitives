@@ -1,0 +1,21 @@
+{
+  "name": "@mastra/platform-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "mastra-platform": "./bin/mastra-platform.mjs"
+  },
+  "dependencies": {
+    "@mastra/client-js": "1.59.0",
+    "@mastra/platform": "workspace:*",
+    "esbuild": "0.28.2",
+    "json-schema-to-zod": "2.8.1",
+    "nf3": "0.4.2",
+    "tar": "7.5.22"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "7.0.2"
+  }
+}
