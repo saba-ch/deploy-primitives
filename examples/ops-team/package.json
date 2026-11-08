@@ -1,0 +1,16 @@
+{
+  "name": "ops-team",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mastra/core": "1.82.0",
+    "@mastra/platform-client": "workspace:*",
+    "ai": "7.0.165",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@mastra/platform-cli": "workspace:*",
+    "typescript": "7.0.2",
+    "@types/node": "^26.0.0"
+  }
+}
