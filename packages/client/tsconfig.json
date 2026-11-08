@@ -1,0 +1,1 @@
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "module": "esnext", "moduleResolution": "bundler", "allowImportingTsExtensions": false, "lib": ["es2023", "dom"] }, "include": ["src"] }
