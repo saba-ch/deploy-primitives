@@ -1,0 +1,17 @@
+{
+  "name": "support-team",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mastra/core": "1.82.0",
+    "@mastra/memory": "1.41.0",
+    "ai": "7.0.165",
+    "sharp": "0.35.5",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@mastra/platform-cli": "workspace:*",
+    "@types/node": "^26.0.0",
+    "typescript": "7.0.2"
+  }
+}
