@@ -1,0 +1,23 @@
+{
+  "name": "@mastra/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts",
+    "./platform-pkgs": "./src/platform-pkgs.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "1.19.18",
+    "@mastra/core": "1.82.0",
+    "@mastra/hono": "1.7.24",
+    "@mastra/libsql": "1.29.0",
+    "hono": "4.13.17",
+    "tar": "7.5.22",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "7.0.2"
+  }
+}
