@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform dashboard</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
+    --accent: #2f6fdb; --ok: #1f8a4c; --warn: #b26b00; --bad: #c0392b; --chip: #efefea;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --panel: #1e1e1c; --ink: #ecece8; --muted: #9a9a93; --line: #31312e;
+            --accent: #6d9ef0; --ok: #4cc27f; --warn: #e0a040; --bad: #ef6b5b; --chip: #2a2a27; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 18px 24px 8px; flex-wrap: wrap; }
+  h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .meta { color: var(--muted); font-size: 12.5px; }
+  main { display: grid; gap: 16px; padding: 8px 24px 32px; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0; padding: 12px 14px 8px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 14px; border-top: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  td.wrap { white-space: normal; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip); font-size: 12px; }
+  .serving, .success { color: var(--ok); } .draining, .suspended, .running, .starting { color: var(--warn); }
+  .failed, .canceled, .ended { color: var(--bad); } .muted { color: var(--muted); }
+  button, select { font: inherit; font-size: 12.5px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .empty { padding: 10px 14px 14px; color: var(--muted); }
+  .scroll { overflow-x: auto; }
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  @media (max-width: 600px) { main { grid-template-columns: 1fr; padding: 8px 16px 24px; } header { padding: 16px 16px 6px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Platform</h1>
+  <span class="meta" id="meta">connecting…</span>
+  <span class="meta">Playground: <code>npx mastra studio --server-port <span id="port">4200</span></code></span>
+</header>
+<main>
+  <section><h2>Units</h2><div class="scroll" id="units"></div></section>
+  <section><h2>Threads</h2><div class="scroll" id="threads"></div></section>
+  <section><h2>Runs</h2><div class="scroll" id="runs"></div></section>
+  <section><h2>Deploys</h2><div class="scroll" id="deploys"></div></section>
+</main>
+<div id="toast"></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const ago = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${Math.round(s / 3600)}h ago`; };
+  const mb = (b) => (b == null ? '—' : `${(b / 1e6).toFixed(0)} MB`);
+  const get = (p) => fetch(p).then((r) => r.json());
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2500); }
+  async function act(p, init, msg) {
+    const res = await fetch(p, init);
+    const body = await res.json().catch(() => ({}));
+    toast(res.ok ? msg : `failed: ${body.error ?? res.status}`);
+    refresh();
+  }
+  const table = (head, rows, empty) => rows.length
+    ? `<table><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
+    : `<div class="empty">${empty}</div>`;
+
+  window.rollback = (unit) => {
+    const v = document.querySelector(`select[data-unit="${CSS.escape(unit)}"]`).value;
+    act(`/_platform/units/${encodeURIComponent(unit)}/tags/prod`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: Number(v) }) }, `${unit} prod → v${v}`);
+  };
+  window.endThread = (key) => act(`/_platform/threads/${encodeURIComponent(key)}`, { method: 'DELETE' }, `ended ${key}`);
+  window.cancelRun = (unit, runId) => act(`/api/workflows/${encodeURIComponent(unit)}/runs/${runId}/cancel?runId=${runId}`, { method: 'POST' }, `canceled ${runId.slice(0, 8)}`);
+  window.resumeRun = async (unit, runId) => {
+    const run = await get(`/api/workflows/${encodeURIComponent(unit)}/runs/${runId}`);
+    const steps = Object.entries(run.steps ?? run.snapshot?.context ?? {}).filter(([, s]) => s?.status === 'suspended').map(([id]) => id);
+    const step = prompt('Step to resume', steps[0] ?? '');
+    if (!step) return;
+    const data = prompt(`resumeData for ${step} (JSON)`, '{}');
+    if (data == null) return;
+    let resumeData; try { resumeData = JSON.parse(data); } catch { return toast('resumeData is not JSON'); }
+    act(`/api/workflows/${encodeURIComponent(unit)}/resume-async?runId=${runId}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step, resumeData }) }, `resumed ${runId.slice(0, 8)}`);
+  };
+
+  async function refresh() {
+    try {
+      const [health, units, threads, runs, deploys] = await Promise.all(['/_platform/health', '/_platform/units', '/_platform/threads', '/_platform/runs', '/_platform/deploys'].map(get));
+      $('meta').textContent = `${location.host} · ${threads.length} threads · platform RSS ${mb(health.rss)}`;
+      $('port').textContent = location.port || '80';
+      $('units').innerHTML = table(['Unit', 'Kind', 'Repo', 'Prod', 'Fingerprint', ''], units.map((u) => [
+        `<b>${esc(u.id)}</b>`, esc(u.kind), esc(u.repo), `<span class="chip">v${u.prod?.version ?? '—'}</span>`, `<code>${esc(u.prod?.fingerprint ?? '')}</code>`,
+        `<select data-unit="${esc(u.id)}">${u.versions.slice().reverse().map((v) => `<option value="${v.version}" ${v.version === u.prod?.version ? 'selected' : ''}>v${v.version} · ${esc(v.deploy)}</option>`).join('')}</select> <button onclick="rollback('${esc(u.id)}')">Roll back</button>`,
+      ]), 'No units yet. Run <code>mastra-platform deploy</code> in a repo.');
+      $('threads').innerHTML = table(['Thread', 'State', 'In flight', 'Calls', 'Heap', 'Last call', ''], threads.sort((a, b) => a.key.localeCompare(b.key)).map((t) => [
+        `<code>${esc(t.key)}</code> <span class="muted">#${t.threadId}</span>`, `<span class="${t.state}">${t.state}</span>`, t.inFlight, t.calls, mb(t.heapUsed), ago(t.lastUsed),
+        `<button onclick="endThread('${esc(t.key)}')">End</button>`,
+      ]), 'No threads running. The next call to a unit starts one.');
+      $('runs').innerHTML = table(['Run', 'Unit', 'Pinned', 'Status', 'Updated', ''], runs.slice(0, 50).map((r) => [
+        `<code>${esc(r.run_id.slice(0, 8))}</code>`, esc(r.unit), `<span class="chip">v${r.version}</span>`, `<span class="${esc(r.status)}">${esc(r.status)}</span>`, ago(r.updated_at),
+        ['suspended', 'waiting', 'paused'].includes(r.status)
+          ? `<button onclick="resumeRun('${esc(r.unit)}','${esc(r.run_id)}')">Resume</button> <button onclick="cancelRun('${esc(r.unit)}','${esc(r.run_id)}')">Cancel</button>`
+          : r.status === 'running' ? `<button onclick="cancelRun('${esc(r.unit)}','${esc(r.run_id)}')">Cancel</button>` : '',
+      ]), 'No workflow runs yet.');
+      $('deploys').innerHTML = table(['Deploy', 'Units', 'In use', ''], deploys.slice().reverse().map((d) => [
+        `<b>${esc(d.repo)}</b> #${d.number}`, `<span class="wrap">${d.units.map((u) => `${esc(u.unit)} v${u.version}`).join(', ') || '<span class="muted">—</span>'}</span>`,
+        [d.tagged && 'prod', d.openRuns && `${d.openRuns} open runs`, d.threads && 'threads', d.recent && !d.tagged && 'kept for rollback'].filter(Boolean).join(' · ') || '<span class="muted">no</span>',
+        d.removed ? '<span class="muted">folder removed</span>' : '',
+      ]), 'No deploys yet.');
+    } catch (err) {
+      $('meta').textContent = `can't reach the platform: ${err.message}`;
+    }
+  }
+  refresh();
+  setInterval(refresh, 1500);
+</script>
+</body>
+</html>
